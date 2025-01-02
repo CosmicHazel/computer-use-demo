@@ -4,6 +4,7 @@ Entrypoint for streamlit, see https://docs.streamlit.io/
 
 import asyncio
 import base64
+import logging
 import os
 import subprocess
 import traceback
@@ -22,11 +23,10 @@ from anthropic.types.beta import (
     BetaTextBlockParam,
     BetaToolResultBlockParam,
 )
-from streamlit.delta_generator import DeltaGenerator
-from fastapi import FastAPI, Response
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-import logging
+from streamlit.delta_generator import DeltaGenerator
 
 from computer_use_demo.loop import (
     PROVIDER_TO_DEFAULT_MODEL_NAME,
@@ -431,17 +431,16 @@ def _render_message(
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('/tmp/streamlit.log'),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler("/tmp/streamlit.log"), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
+
 
 class CommandRequest(BaseModel):
     command: str
     system_prompt: str | None = None
+
 
 app = FastAPI()
 
@@ -454,6 +453,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.post("/api/command")
 async def send_command(request: CommandRequest):
     try:
@@ -461,15 +461,21 @@ async def send_command(request: CommandRequest):
         setup_state()
         if "messages" not in st.session_state:
             st.session_state.messages = []
-        
-        st.session_state.messages.append({
-            "role": Sender.USER,
-            "content": [BetaTextBlockParam(type="text", text=request.command)],
-        })
-        
+
+        st.session_state.messages.append(
+            {
+                "role": Sender.USER,
+                "content": [BetaTextBlockParam(type="text", text=request.command)],
+            }
+        )
+
         # Use request system prompt if provided, otherwise fall back to session state
-        system_prompt = request.system_prompt if request.system_prompt is not None else st.session_state.custom_system_prompt
-        
+        system_prompt = (
+            request.system_prompt
+            if request.system_prompt is not None
+            else st.session_state.custom_system_prompt
+        )
+
         # Run the sampling loop without Streamlit UI components
         messages = await sampling_loop(
             system_prompt_suffix=system_prompt,
@@ -482,7 +488,7 @@ async def send_command(request: CommandRequest):
             api_key=st.session_state.api_key,
             only_n_most_recent_images=st.session_state.only_n_most_recent_images,
         )
-        
+
         st.session_state.messages = messages
         logger.info("Command processed successfully")
 
@@ -496,10 +502,10 @@ async def send_command(request: CommandRequest):
                             text_responses.append(block["text"])
                 elif isinstance(message["content"], str):
                     text_responses.append(message["content"])
-        
+
         # Join all text responses
         response_text = " ".join(text_responses)
-        
+
         return {"status": "success", "response": response_text}
     except Exception as e:
         logger.error(f"Error processing command: {str(e)}", exc_info=True)
