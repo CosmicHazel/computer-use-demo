@@ -494,14 +494,19 @@ async def send_command(request: CommandRequest):
 
         # Extract only text responses from the assistant's messages
         text_responses = []
-        for message in messages:
+        # Get only the last assistant message
+        for message in reversed(messages):
             if message["role"] == "assistant":
                 if isinstance(message["content"], list):
-                    for block in message["content"]:
+                    # Get only the last text block
+                    for block in reversed(message["content"]):
                         if isinstance(block, dict) and block["type"] == "text":
                             text_responses.append(block["text"])
+                            break
+                    break
                 elif isinstance(message["content"], str):
                     text_responses.append(message["content"])
+                    break
 
         # Join all text responses
         response_text = " ".join(text_responses)
